@@ -1,21 +1,25 @@
 # -*- coding: utf-8 -*-
 
 from Acquisition import aq_base
-from Products.CMFCore.interfaces import ISiteRoot
-from Products.CMFCore.utils import getToolByName
 from datetime import datetime
 from plone.app.layout.navigation.root import getNavigationRootObject
+from Products.CMFCore.interfaces import ISiteRoot
+from Products.CMFCore.utils import getToolByName
+from urlparse import urlparse
+from z3c.form.interfaces import IForm
+from zope.component import ComponentLookupError
+from zope.component import getMultiAdapter
 from zope.component import providedBy
 from zope.component import queryUtility
 from zope.component.hooks import getSite
+from zope.component.interfaces import ISite
+from zope.globalrequest import getRequest
 from zope.i18n import translate
 from zope.i18nmessageid import MessageFactory
 from zope.schema.interfaces import IVocabularyFactory
-from z3c.form.interfaces import IForm
-from zope.component import getMultiAdapter
-from zope.component import ComponentLookupError
+
 import json
-from zope.globalrequest import getRequest
+
 
 _ = MessageFactory('plone')
 
@@ -25,6 +29,42 @@ try:
     HAS_PAE = True
 except ImportError:
     HAS_PAE = False
+
+
+def get_top_site_from_url(context, request):
+    """Find the top-most site, which is still in the url path.
+
+    If the current context is within a subsite within a PloneSiteRoot and no
+    virtual hosting is in place, the PloneSiteRoot is returned.
+    When at the same context but in a virtual hosting environment with the
+    virtual host root pointing to the subsites, it returns the subsite instead
+    of the PloneSiteRoot.
+
+    For this given content structure:
+
+    /Plone/Subsite
+
+    It should return the following in these cases:
+
+    - Naked Plone without virtual hosting, /Plone: Plone
+    - Naked Plone without virtual hosting, /Plone/Subsite: Plone
+    - Virtual hosting which roots to the subsite: Subsite
+    """
+    url_path = urlparse(context.absolute_url()).path.split('/')
+
+    site = getSite()
+    try:
+        for idx in range(len(url_path)):
+            _path = '/'.join(url_path[:idx + 1]) or '/'
+            site_path = request.physicalPathFromURL(_path)
+            site = context.restrictedTraverse('/'.join(site_path) or '/')
+            if ISite.providedBy(site):
+                break
+    except ValueError:
+        # Refs: https://github.com/plone/plone.app.content/issues/103
+        # On error, just return getSite.
+        return getSite()
+    return site
 
 
 def first_weekday():
@@ -120,13 +160,13 @@ def get_ajaxselect_options(context, value, separator, vocabulary_name,
 
 def get_relateditems_options(context, value, separator, vocabulary_name,
                              vocabulary_view, field_name=None):
-    portal = get_portal()
-    options = get_ajaxselect_options(portal, value, separator,
-                                     vocabulary_name, vocabulary_view,
-                                     field_name)
     if IForm.providedBy(context):
         context = context.context
     request = getRequest()
+    site = get_top_site_from_url(context, request)
+    options = get_ajaxselect_options(site, value, separator,
+                                     vocabulary_name, vocabulary_view,
+                                     field_name)
     msgstr = translate(_(u'Search'), context=request)
     options.setdefault('searchText', msgstr)
     msgstr = translate(_(u'Entire site'), context=request)
@@ -139,18 +179,14 @@ def get_relateditems_options(context, value, separator, vocabulary_name,
     options.setdefault(
         'treeVocabularyUrl',
         '{}/@@getVocabulary?name=plone.app.vocabularies.Catalog'.format(
-            portal is not None and portal.absolute_url() or '')
+            site is not None and site.absolute_url() or '')
     )
     options.setdefault('sort_on', 'sortable_title')
     options.setdefault('sort_order', 'ascending')
 
-    nav_root = getNavigationRootObject(context, portal)
-    options['basePath'] = (
-        '/'.join(nav_root.getPhysicalPath()) if nav_root else '/'
-    )
-    options['rootPath'] = (
-        '/'.join(portal.getPhysicalPath()) if portal else '/'
-    )
+    nav_root = getNavigationRootObject(context, site)
+    options['basePath'] = '/'.join(nav_root.getPhysicalPath()) if nav_root else '/'  # noqa
+    options['rootPath'] = '/'.join(site.getPhysicalPath())
     return options
 
 
