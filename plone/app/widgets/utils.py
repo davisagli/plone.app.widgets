@@ -4,6 +4,7 @@ from Products.CMFCore.interfaces import ISiteRoot
 from Products.CMFCore.interfaces._content import IFolderish
 from Products.CMFCore.utils import getToolByName
 from Products.CMFPlone.interfaces import IPloneSiteRoot
+from Products.highcountrynews.content.newsarticle import getImageSizes
 from datetime import datetime
 from plone.app.layout.navigation.root import getNavigationRootObject
 from plone.registry.interfaces import IRegistry
@@ -208,19 +209,14 @@ def get_tinymce_options(context, field, request):
         # override config plugins settings
         # XXX: the list of loaded plugins may change in plone-mockup
         config['plugins'] = [
-            'advlist',
             'autolink',
             'lists',
             'charmap',
             'print',
-            'preview',
             'anchor',
             'searchreplace',
-            'visualblocks',
             'code',
             'fullscreen',
-            'insertdatetime',
-            'media',
             'table',
             'contextmenu',
             'paste',
@@ -407,20 +403,16 @@ def get_tinymce_options(context, field, request):
                 s_format['classes'] = f_parts[2]
             p_style_formats.append(s_format)
         if p_style_formats:
-            config["style_formats"] = [
-                dict(title=u"Plone Styles", items=p_style_formats),
-            ]
-            # XXX: Maybe there should be an option to merge default styles or
-            # not
-            config["style_formats_merge"] = "true"
+            config["style_formats"] = p_style_formats
+            config["style_formats_merge"] = False
 
         # respect resizing settings
         config['resize'] = utility.resizing
 
+        config['height'] = config.pop('theme_advanced_source_editor_height')
         if utility.autoresize:
             config['plugins'].append('autoresize')
-            config['autoresize_min_height'] = config[
-                'theme_advanced_source_editor_height']
+            config['autoresize_min_height'] = config['height']
 
         folder = context
         if not IFolderish.providedBy(context):
@@ -430,9 +422,16 @@ def get_tinymce_options(context, field, request):
         else:
             initial = IUUID(folder, None)
         portal_url = get_portal_url(context)
-        nav_root = getNavigationRootObject(context, get_portal())
+        portal = get_portal()
+        nav_root = getNavigationRootObject(context, portal)
         folder_path = '/'.join(folder.getPhysicalPath())
         folder_url_relative = folder.absolute_url()[len(portal_url):]
+
+        sizes = sorted(
+            getImageSizes().items(), key=lambda x: x[1], reverse=True)
+        scales = ','.join(
+            '{} ({}x{}):{}'.format(key.capitalize(), size[0], size[1], key)
+            for key, size in sizes)
 
         options = {
             'relatedItems': {
@@ -440,11 +439,11 @@ def get_tinymce_options(context, field, request):
                     portal_url,
                     '@@getVocabulary?name=plone.app.vocabularies.Catalog'
                 ),
-                'mode': 'browse',
+                'mode': 'search',
                 'basePath': folder_path,
                 'rootPath': '/'.join(nav_root.getPhysicalPath()) if nav_root
                             else '/',
-                'folderTypes': utility.containsobjects.split('\n')
+                'folderTypes': ','.join(utility.containsobjects.split('\n')),
             },
             'upload': {
                 'initialFolder': initial,
@@ -461,10 +460,11 @@ def get_tinymce_options(context, field, request):
             'prependToUrl': 'resolveuid/',
             'linkAttribute': 'UID',
             'prependToScalePart': '/@@images/image/',
-            'folderTypes': utility.containsobjects.split('\n'),
-            'imageTypes': utility.imageobjects.split('\n'),
+            'scales': scales,
+            'folderTypes': ','.join(utility.containsobjects.split('\n')),
+            'imageTypes': ','.join(utility.imageobjects.split('\n')),
             'anchorSelector': utility.anchor_selector,
-            'linkableTypes': utility.linkable.split('\n')
+            'linkableTypes': ','.join(utility.linkable.split('\n')),
         }
     else:
         # Plone 5
