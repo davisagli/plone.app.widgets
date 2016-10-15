@@ -27,6 +27,7 @@ from zope.component.globalregistry import base
 from zope.globalrequest import setRequest
 from zope.interface import Interface
 from zope.interface import alsoProvides
+from zope.schema import BytesLine
 from zope.schema import Choice
 from zope.schema import Date
 from zope.schema import Datetime
@@ -952,7 +953,6 @@ class RelatedItemsWidgetTests(unittest.TestCase):
                 'value': u'',
                 'pattern': 'relateditems',
                 'pattern_options': {
-                    'folderTypes': ['SomeType'],
                     'selectableTypes': ['SomeSelectableType', ],
                     'homeText': u'Home',
                     'searchAllText': u'Entire site',
@@ -1060,17 +1060,27 @@ class RelatedItemsWidgetTests(unittest.TestCase):
 
     def test_converter_List_of_Choice(self):
         from plone.app.widgets.dx import RelatedItemsDataConverter
-        field = List()
-        widget = Mock(separator=';')
-        converter = RelatedItemsDataConverter(field, widget)
+        fields = (
+            List(),
+            List(value_type=TextLine()),
+            List(value_type=BytesLine()),
+            )
+        for field in fields:
+            expected_value_type = getattr(field.value_type, '_type', unicode)
+            widget = Mock(separator=';')
+            converter = RelatedItemsDataConverter(field, widget)
 
-        self.assertEqual(converter.toWidgetValue(None), None)
-        self.assertEqual(
-            converter.toWidgetValue(['id1', 'id2']), 'id1;id2')
+            self.assertEqual(converter.toWidgetValue(None), None)
+            self.assertEqual(
+                converter.toWidgetValue(['id1', 'id2']), 'id1;id2')
 
-        self.assertEqual(converter.toFieldValue(None), None)
-        self.assertEqual(
-            converter.toFieldValue('id1;id2'), ['id1', 'id2'])
+            self.assertEqual(converter.toFieldValue(None), None)
+            self.assertEqual(
+                converter.toFieldValue('id1;id2'), ['id1', 'id2'])
+            self.assertEqual(
+                type(converter.toFieldValue('id1;id2')[0]),
+                expected_value_type
+                )
 
     def test_fieldwidget(self):
         from plone.app.widgets.dx import RelatedItemsWidget
@@ -1102,9 +1112,11 @@ def _custom_field_widget(field, request):
 
 
 def _enable_custom_widget(field):
-    provideAdapter(_custom_field_widget, adapts=
-                   (getSpecification(field), IWidgetsLayer),
-                   provides=IFieldWidget)
+    provideAdapter(
+        _custom_field_widget,
+        adapts=(getSpecification(field), IWidgetsLayer),
+        provides=IFieldWidget
+        )
 
 
 def _disable_custom_widget(field):
@@ -1153,12 +1165,6 @@ class RichTextWidgetTests(unittest.TestCase):
         self.assertEqual(
             base_args['pattern_options']['relatedItems']['basePath'],
             '/plone'
-        )
-        # Next, we're only testing for the existance of folderTypes parameter.
-        # Values can either be set via GenericSetup (tinymce.xml) or
-        # plone.app.registry.
-        self.assertTrue(
-            'folderTypes' in base_args['pattern_options']['relatedItems']
         )
 
         if not PLONE50:

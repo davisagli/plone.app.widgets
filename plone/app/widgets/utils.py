@@ -7,9 +7,10 @@ from Products.CMFPlone.interfaces import IPloneSiteRoot
 from Products.highcountrynews.content.newsarticle import getImageSizes
 from datetime import datetime
 from plone.app.layout.navigation.root import getNavigationRootObject
+from plone.portlets.interfaces import IPortletAssignmentMapping
 from plone.registry.interfaces import IRegistry
 from plone.uuid.interfaces import IUUID
-from z3c.form.interfaces import IAddForm
+from z3c.form.interfaces import IForm
 from zope.component import getMultiAdapter
 from zope.component import getUtility
 from zope.component import providedBy
@@ -141,7 +142,7 @@ def get_relateditems_options(context, value, separator, vocabulary_name,
     options = get_ajaxselect_options(context, value, separator,
                                      vocabulary_name, vocabulary_view,
                                      field_name)
-    if IAddForm.providedBy(context):
+    if IForm.providedBy(context):
         context = context.context
     request = getattr(context, 'REQUEST')
     msgstr = translate(_plone(u'Search'), context=request)
@@ -152,12 +153,6 @@ def get_relateditems_options(context, value, separator, vocabulary_name,
                               default=u'Home'),
                        context=request)
     options.setdefault('homeText', msgstr)
-    options.setdefault('folderTypes', ['Folder'])
-
-    properties = getToolByName(context, 'portal_properties')
-    if properties:
-        options['folderTypes'] = properties.site_properties.getProperty(
-            'typesLinkToFolderContentsInFC', options['folderTypes'])
 
     if getattr(widget, 'selectable_types', None):
         options['selectableTypes'] = widget.selectable_types
@@ -320,7 +315,9 @@ def get_tinymce_options(context, field, request):
 
         button_settings['directionality'] = 'attribs' in config[
             'buttons'] and 'ltr rtl' or ''
-        # TODO: mapping for spellchecker after plugin has been fixed
+        
+        # enable browser spell check by default:
+        config['browser_spellcheck'] = True
 
         # FIXME: currently save button does not show up
         if 'save' in config['buttons']\
@@ -368,6 +365,15 @@ def get_tinymce_options(context, field, request):
             lambda pair: {'title': pair[0], 'value': pair[1]},
             [e.strip().split('|') for e in utility.tablestyles.split('\n')]
         )
+
+        # if forecolor/backcolor enabled in buttons, allow paste of color
+        # in text from word processing / rich text:
+        paste_allow = []
+        if 'forecolor' in config['buttons']:
+            paste_allow.append('color')
+        if 'backcolor' in config['buttons']:
+            paste_allow.append('background')
+        config['paste_retain_style_properties'] = ' '.join(paste_allow)
 
         # contextmenu is no longer available, use this setting for menubar
         # FIXME: plone5 rename setting
@@ -417,6 +423,8 @@ def get_tinymce_options(context, field, request):
         folder = context
         if not IFolderish.providedBy(context):
             folder = aq_parent(context)
+        if IPortletAssignmentMapping.providedBy(folder):
+            folder = aq_parent(folder)
         if IPloneSiteRoot.providedBy(folder):
             initial = None
         else:
@@ -443,7 +451,6 @@ def get_tinymce_options(context, field, request):
                 'basePath': folder_path,
                 'rootPath': '/'.join(nav_root.getPhysicalPath()) if nav_root
                             else '/',
-                'folderTypes': ','.join(utility.containsobjects.split('\n')),
             },
             'upload': {
                 'initialFolder': initial,
@@ -499,7 +506,7 @@ def get_portal_url(context):
 
 
 def get_context_url(context):
-    if IAddForm.providedBy(context):
+    if IForm.providedBy(context):
         # Use the request URL if we are looking at an addform
         url = context.request.get('URL')
     elif hasattr(context, 'absolute_url'):

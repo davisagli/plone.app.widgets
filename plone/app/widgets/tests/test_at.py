@@ -119,6 +119,16 @@ class DateWidgetTests(unittest.TestCase):
             (datetime(2011, 11, 22))
         )
 
+    def test_process_form_empty_existing(self):
+        form = {
+            'fieldname': ''
+        }
+        self.assertEqual(
+            self.widget.process_form(
+                self.context, self.field, form)[0],
+            None
+        )
+
 
 class DatetimeWidgetTests(unittest.TestCase):
 
@@ -188,6 +198,16 @@ class DatetimeWidgetTests(unittest.TestCase):
             self.widget.process_form(
                 self.context, self.field, form)[0].asdatetime(),
             (datetime(2011, 11, 22, 13, 30))
+        )
+
+    def test_process_form_empty_existing(self):
+        form = {
+            'fieldname': ''
+        }
+        self.assertEqual(
+            self.widget.process_form(
+                self.context, self.field, form)[0],
+            None
         )
 
 
@@ -343,7 +363,6 @@ class RelatedItemsWidgetTests(unittest.TestCase):
                 'value': '{};{}'.format(IUUID(obj1), IUUID(obj2)),
                 'pattern': 'relateditems',
                 'pattern_options': {
-                    'folderTypes': ['SomeType'],
                     'selectableTypes': ['SomeSelectableType', ],
                     'homeText': u'Home',
                     'searchAllText': u'Entire site',
@@ -388,7 +407,6 @@ class RelatedItemsWidgetTests(unittest.TestCase):
                 'value': '{}'.format(IUUID(obj1)),
                 'pattern': 'relateditems',
                 'pattern_options': {
-                    'folderTypes': ['SomeType'],
                     'homeText': u'Home',
                     'separator': ';',
                     'orderable': True,
@@ -421,7 +439,6 @@ class RelatedItemsWidgetTests(unittest.TestCase):
                 'value': '',
                 'pattern': 'relateditems',
                 'pattern_options': {
-                    'folderTypes': ['SomeType'],
                     'homeText': u'Home',
                     'separator': ';',
                     'orderable': True,
@@ -471,7 +488,6 @@ class RelatedItemsWidgetTests(unittest.TestCase):
                 'value': '{}'.format(IUUID(obj1)),
                 'pattern': 'relateditems',
                 'pattern_options': {
-                    'folderTypes': ['SomeType'],
                     'homeText': u'Home',
                     'separator': ';',
                     'orderable': True,
@@ -502,7 +518,6 @@ class RelatedItemsWidgetTests(unittest.TestCase):
                 'value': '{};{}'.format(IUUID(obj1), IUUID(obj2)),
                 'pattern': 'relateditems',
                 'pattern_options': {
-                    'folderTypes': ['SomeType'],
                     'homeText': u'Home',
                     'separator': ';',
                     'orderable': True,
