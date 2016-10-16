@@ -415,7 +415,12 @@ def get_tinymce_options(context, field, request):
         # respect resizing settings
         config['resize'] = utility.resizing
 
-        config['height'] = config.pop('theme_advanced_source_editor_height')
+        height = config.pop('theme_advanced_source_editor_height')
+        rows = hasattr(field, 'widget') and getattr(field.widget, 'rows', None)
+        if rows:
+            config['height'] = 20 * rows
+        else:
+            config['height'] = height
         if utility.autoresize:
             config['plugins'].append('autoresize')
             config['autoresize_min_height'] = config['height']

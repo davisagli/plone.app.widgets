@@ -569,6 +569,7 @@ class TinyMCEWidget(BaseWidget):
     _properties.update({
         'pattern': 'tinymce',
         'pattern_options': {},
+        'rows': 10,
     })
 
     def _base_args(self, context, field, request):
@@ -580,6 +581,7 @@ class TinyMCEWidget(BaseWidget):
         args['value'] = (request.get(field.getName(),
                                      field.getRaw(context))
                          ).decode(charset)
+        args['rows'] = self.rows
 
         args.setdefault('pattern_options', {})
         merged = dict_merge(get_tinymce_options(context, field, request),

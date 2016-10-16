@@ -282,8 +282,11 @@ class TextareaWidget(BaseWidget):
     """Widget with `textarea` element."""
 
     name = el_attrib('name')
+    rows = el_attrib('rows')
 
-    def __init__(self, pattern, pattern_options={}, name=None, value=None):
+    def __init__(
+            self, pattern, pattern_options={}, name=None, value=None,
+            rows=None):
         """
         :param pattern: [required] Pattern name.
         :type pattern: string
@@ -304,6 +307,8 @@ class TextareaWidget(BaseWidget):
             self.name = name
         if value is not None:
             self.value = value
+        if rows is not None:
+            self.rows = str(rows)
 
     def _get_value(self):
         """
